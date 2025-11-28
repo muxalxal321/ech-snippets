@@ -44,7 +44,7 @@ ECH 查询域名 (default "cloudflare-ech.com")
 
 3. **复制你刚刚的自定义域名，用客户端启动**  
    默认混合代理端口运行在本机的30000端口上，比如在win11下为ech-workers-windows-amd64.exe -f 你的自定义域名:443 -l 127.0.0.1:30000 -token 你的token -ip 你的优选ip  
-   或者你也可以使用股神的GUI，但是我习惯使用nekobox的自定义核心来调用。
+   我习惯使用nekobox的自定义核心来调用。
 
 ## nekobox的调用
 
