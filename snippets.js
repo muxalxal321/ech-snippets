@@ -103,14 +103,30 @@ async function handleSession(webSocket) {
   };
 
   const connectToRemote = async (targetAddr, firstFrameData) => {
-    const { host, port } = parseAddress(targetAddr);
-    const attempts = [null, ...CF_FALLBACK_IPS];
+    const original = parseAddress(targetAddr);  // 解析原始的 host 和 port
+    const attempts = [null, ...CF_FALLBACK_IPS];  // attempts[0] = null 表示用原始
 
     for (let i = 0; i < attempts.length; i++) {
+      let attemptHost = original.host;
+      let attemptPort = original.port;
+
+      if (attempts[i] !== null) {
+        // 对于 fallback 项，尝试解析它（支持 'host:port' 或纯 'host'）
+        try {
+          const parsedFallback = parseAddress(attempts[i]);
+          attemptHost = parsedFallback.host;
+          attemptPort = parsedFallback.port;  // 如果有端口，用 fallback 的端口
+        } catch {
+          // 如果解析失败（无端口），则假设是纯 host，用原始端口
+          attemptHost = attempts[i];
+          attemptPort = original.port;
+        }
+      }
+
       try {
         remoteSocket = connect({
-          hostname: attempts[i] || host,
-          port
+          hostname: attemptHost,
+          port: attemptPort
         });
 
         if (remoteSocket.opened) await remoteSocket.opened;
