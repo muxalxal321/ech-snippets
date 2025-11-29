@@ -95,60 +95,62 @@ async function handleSession(webSocket) {
   const connectToRemote = async (targetAddr, firstFrameData) => {
     const original = parseAddress(targetAddr);  // 解析原始的 host 和 port
     const attempts = [null, ...CF_FALLBACK_IPS];  // attempts[0] = null 表示用原始
+  
     for (let i = 0; i < attempts.length; i++) {
       let attemptHost = original.host;
       let attemptPort = original.port;
+  
       if (attempts[i] !== null) {
         const fallback = attempts[i];
-        if (fallback.includes(':')) {
-          // 如果包含 ':'，假设是 host:port 或 [ipv6]:port，解析它
-          try {
-            const parsedFallback = parseAddress(fallback);
-            if (!isNaN(parsedFallback.port)) {
-              attemptHost = parsedFallback.host;
-              attemptPort = parsedFallback.port;
-            } else {
-              throw new Error('Invalid port');
-            }
-          } catch {
-            // 解析失败，回退到默认
+        try {
+          const parsed = parseAddress(fallback);  // 尝试解析（无论格式）
+          if (!isNaN(parsed.port)) {  // 如果 port 有效，用它
+            attemptHost = parsed.host;
+            attemptPort = parsed.port;
+          } else {  // port 无效（NaN），用默认 443
             attemptHost = fallback;
             attemptPort = 443;
           }
-        } else {
-          // 如果不包含 ':'，假设是纯 host，用默认 443 端口
+        } catch {  // 任何解析错误（如缺少 ':' 或无效格式），用默认 443
           attemptHost = fallback;
           attemptPort = 443;
         }
       }
+  
       try {
         remoteSocket = connect({
           hostname: attemptHost,
           port: attemptPort
         });
+  
         if (remoteSocket.opened) await remoteSocket.opened;
+  
         remoteWriter = remoteSocket.writable.getWriter();
         remoteReader = remoteSocket.readable.getReader();
+  
         // 发送首帧数据
         if (firstFrameData) {
           await remoteWriter.write(encoder.encode(firstFrameData));
         }
+  
         webSocket.send('CONNECTED');
         pumpRemoteToWebSocket();
         return;
+  
       } catch (err) {
         // 清理失败的连接
         try { remoteWriter?.releaseLock(); } catch {}
         try { remoteReader?.releaseLock(); } catch {}
         try { remoteSocket?.close(); } catch {}
         remoteWriter = remoteReader = remoteSocket = null;
+  
         // 如果不是 CF 错误或已是最后尝试，抛出错误
         if (!isCFError(err) || i === attempts.length - 1) {
           throw err;
         }
       }
     }
-  };
+  };  
   webSocket.addEventListener('message', async (event) => {
     if (isClosed) return;
     try {
